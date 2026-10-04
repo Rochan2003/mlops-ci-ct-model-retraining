@@ -1,0 +1,14 @@
+.venv/
+venv/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# MLflow writes here locally. On the CI runner it gets thrown away with the
+# machine, so it's uploaded as a build artifact instead.
+mlruns/
+
+.idea/
+.vscode/
+.DS_Store
