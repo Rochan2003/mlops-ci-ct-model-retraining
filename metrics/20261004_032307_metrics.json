@@ -1,0 +1,47 @@
+{
+    "timestamp": "20261004_032307",
+    "test_rows": 114,
+    "selection": {
+        "metric": "brier_score",
+        "champion": "logreg_baseline",
+        "champion_file": "model_20261004_032307_champion.joblib"
+    },
+    "gate": {
+        "metric": "f1",
+        "threshold": 0.92,
+        "applied_to": "logreg_baseline"
+    },
+    "calibration_effect": {
+        "rf_brier_uncalibrated": 0.033,
+        "best_calibrated_variant": "rf_sigmoid",
+        "rf_brier_calibrated": 0.0338,
+        "improvement": -0.0008,
+        "calibration_helped": false
+    },
+    "models": {
+        "rf_uncalibrated": {
+            "accuracy": 0.9561,
+            "f1": 0.9655,
+            "roc_auc": 0.9931,
+            "brier_score": 0.033
+        },
+        "rf_sigmoid": {
+            "accuracy": 0.9561,
+            "f1": 0.9655,
+            "roc_auc": 0.9927,
+            "brier_score": 0.0338
+        },
+        "rf_isotonic": {
+            "accuracy": 0.9474,
+            "f1": 0.9583,
+            "roc_auc": 0.9927,
+            "brier_score": 0.0382
+        },
+        "logreg_baseline": {
+            "accuracy": 0.9825,
+            "f1": 0.9861,
+            "roc_auc": 0.9954,
+            "brier_score": 0.0215
+        }
+    }
+}
