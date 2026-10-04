@@ -1,0 +1,20 @@
+name: Scheduled Retrain
+
+# Weekly rather than daily on purpose as the dataset here is primarily static.
+on:
+  schedule:
+    - cron: '0 6 * * 1'     # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    name: Weekly retrain
+    # Reuses the same pipeline as the push workflow
+    uses: ./.github/workflows/model_retraining_on_push.yml
+    permissions:
+      contents: write
+    with:
+      # Stricter than the 0.92 used on push. Nobody is watching a scheduled
+      # run, so a model has to clear a higher bar before it gets committed
+      # unattended.
+      min_f1: 0.95

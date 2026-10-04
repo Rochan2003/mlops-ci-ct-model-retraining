@@ -1,0 +1,106 @@
+name: CI/CT Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Lets model_retraining_scheduled.yml reuse this pipeline with a different
+  # instead of copying the whole thing.
+  workflow_call:
+    inputs:
+      min_f1:
+        description: 'Minimum F1 the champion must reach'
+        type: number
+        default: 0.92
+
+concurrency:
+  group: ci-ct-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        run: pytest tests/ -v
+
+  train-and-register:
+    name: Retrain, evaluate and version
+    runs-on: ubuntu-latest
+    needs: test              # only runs if the tests passed
+
+    permissions:
+      contents: write        # needed for the commit step at the end
+
+    env:
+      # inputs.min_f1 is only set when another workflow calls this one, so fall
+      # back to the default for push and manual runs.
+      MIN_F1: ${{ inputs.min_f1 || '0.92' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Each step runs in its own shell, so the timestamp goes into GITHUB_ENV
+      # to make it available to the later steps.
+      - name: Generate version timestamp
+        run: echo "TIMESTAMP=$(date '+%Y%m%d_%H%M%S')" >> $GITHUB_ENV
+
+      - name: Train models
+        run: python -m src.train_model --timestamp "$TIMESTAMP"
+
+      - name: Calibrate the Random Forest
+        run: python -m src.calibrate_model --timestamp "$TIMESTAMP"
+
+      # Exits 1 if the champion is below the F1 threshold, which fails the job
+      # here so the commit step below never runs.
+      - name: Evaluate and check quality gate
+        run: python -m src.evaluate_model --timestamp "$TIMESTAMP" --min-f1 "$MIN_F1"
+
+      - name: Print metrics
+        run: cat "metrics/${TIMESTAMP}_metrics.json"
+
+      - name: Commit the new model version
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -f "models/model_${TIMESTAMP}_"*.joblib "metrics/${TIMESTAMP}_metrics.json"
+
+          if git diff --cached --quiet; then
+            echo "Nothing new to commit."
+            exit 0
+          fi
+
+          git commit -m "Model version ${TIMESTAMP} [skip ci]"
+          git pull --rebase --autostash origin main
+          git push origin HEAD:main
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-${{ env.TIMESTAMP }}
+          path: |
+            models/
+            metrics/
+            mlruns/
+          retention-days: 30
